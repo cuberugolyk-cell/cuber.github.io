@@ -40,10 +40,19 @@
   .stars { background: #f7b500; color: #000; }
   .fiat { background: #2481cc; }
   .loading { text-align: center; padding: 40px; opacity: 0.6; }
+  .req {
+    background: var(--tg-theme-secondary-bg-color, #f1f1f1);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    line-height: 1.6;
+  }
 </style>
 </head>
 <body>
 <h1>Магазин услуг</h1>
+<div id="req" class="req" style="display:none;"></div>
 <div id="app"><div class="loading">Загрузка...</div></div>
 
 <script>
@@ -51,13 +60,24 @@ const tg = window.Telegram.WebApp;
 tg.ready();
 tg.expand();
 
-const services = [
-  { id: 1, title: "Telegram-бот", desc: "Приём заказов, запись, квизы, рассылки", stars: 1500, rub: 15000 },
-  { id: 2, title: "Автоматизация", desc: "Отчёты, интеграции, скрипты", stars: 1000, rub: 10000 },
-  { id: 3, title: "Парсер", desc: "Сбор данных, мониторинг цен", stars: 1000, rub: 10000 },
-];
+// ВАЖНО: поменяй на URL своего API после деплоя
+const API_URL = "https://твой-домен/api";
 
-function render() {
+const initData = tg.initData || "";
+const user = tg.initDataUnsafe?.user || {};
+
+async function loadServices() {
+  try {
+    const r = await fetch(`${API_URL}/services`);
+    const data = await r.json();
+    render(data.services);
+  } catch (e) {
+    document.getElementById('app').innerHTML =
+      '<div class="loading">Не удалось загрузить услуги. Проверьте подключение.</div>';
+  }
+}
+
+function render(services) {
   const app = document.getElementById('app');
   app.innerHTML = '';
   services.forEach(s => {
@@ -65,27 +85,32 @@ function render() {
     div.className = 'service';
     div.innerHTML = `
       <h2>${s.title}</h2>
-      <p>${s.desc}</p>
-      <div class="price">⭐ ${s.stars} звёзд · 💳 ${s.rub} ₽</div>
+      <p>${s.description}</p>
+      <div class="price">${s.stars ? `⭐ ${s.stars} звёзд` : ''} ${s.rub ? `· 💳 ${s.rub} ₽` : ''}</div>
     `;
 
-    const btnStars = document.createElement('button');
-    btnStars.className = 'stars';
-    btnStars.textContent = `Оплатить ${s.stars} ⭐`;
-    btnStars.onclick = () => payStars(s);
-    div.appendChild(btnStars);
+    if (s.stars) {
+      const btnStars = document.createElement('button');
+      btnStars.className = 'stars';
+      btnStars.textContent = `Оплатить ${s.stars} ⭐`;
+      btnStars.onclick = () => payStars(s);
+      div.appendChild(btnStars);
+    }
 
-    const btnFiat = document.createElement('button');
-    btnFiat.className = 'fiat';
-    btnFiat.textContent = `Оплатить ${s.rub} ₽`;
-    btnFiat.onclick = () => payFiat(s);
-    div.appendChild(btnFiat);
+    if (s.rub) {
+      const btnFiat = document.createElement('button');
+      btnFiat.className = 'fiat';
+      btnFiat.textContent = `Оплатить ${s.rub} ₽`;
+      btnFiat.onclick = () => payFiat(s);
+      div.appendChild(btnFiat);
+    }
 
     app.appendChild(div);
   });
 }
 
 function payStars(s) {
+  // Отправляем боту через sendData (работает при открытии из кнопки в боте)
   tg.sendData(JSON.stringify({ action: 'pay_stars', service_id: s.id }));
   tg.close();
 }
@@ -95,7 +120,7 @@ function payFiat(s) {
   tg.close();
 }
 
-render();
+loadServices();
 </script>
 </body>
 </html>
